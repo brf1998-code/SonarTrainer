@@ -71,6 +71,12 @@ export interface Signature {
   /** shaft turns (RPM) per knot of speed */
   turnsPerKnot: number;
   tonals: Tonal[];
+  /** pumpjet propulsor: discrete blade-rate content heavily suppressed */
+  pumpjet?: boolean;
+  /** diesel-electric boat: loud diesel lines only when snorkeling */
+  dieselBoat?: boolean;
+  /** platform database id, if built from a real-world class */
+  platformId?: string;
 }
 
 export interface Ship {
@@ -183,6 +189,8 @@ export interface OwnshipLegSummary {
 export interface ScenarioContactDef {
   name: string;
   contactClass: ContactClass;
+  /** platform database id for a real-world class signature */
+  platformId?: string;
   /** initial range from ownship, yards */
   rangeYds: number;
   /** initial true bearing from ownship, deg */
@@ -200,6 +208,8 @@ export interface Scenario {
   ownCourse: number;
   ownSpeed: number;
   ownDepth: number;
+  /** default ownship platform (user-overridable) */
+  ownPlatformId?: string;
   contacts: ScenarioContactDef[];
   /** if set, scenario is the practical portion of this tutorial */
   tutorialId?: string;

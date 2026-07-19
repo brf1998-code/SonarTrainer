@@ -29,8 +29,27 @@ values chosen for tactical plausibility, not fidelity to any real system.
   spelled out, worked Ekelund calculations, solution grading against truth.
 - **Tutorials** that walk through bearing rate, Ekelund ranging, dot-stack TMA,
   and towed-array employment step by step, gated on you actually doing it.
-- **Free-play scenarios**: open-ocean contact management, submerged trail,
-  CZ detection, shallow-water knife fight, Med gradient problem.
+- **Free-play scenarios**: open-ocean contact management, Akula trail,
+  CZ detection, Yuan shallow-water knife fight, Med gradient problem,
+  South China Sea patrol (snorkeling SSK + PLAN SAG), Barents Yasen-M trail.
+- **Platform database (INTEL tab)**: real-world classes — US (688 Flt I,
+  688i, Seawolf, Virginia, Ohio SSGN as selectable ownship), Russian (Kilo
+  877/636.3, Akula, Oscar II, Yasen-M, Borei-A, Slava, Udaloy, Gorshkov,
+  Grigorovich) and Chinese (Yuan, Shang, Jin, projected Type 095, 052D, 055,
+  054A) — with hull/speed/depth/propulsor data and relative quieting
+  assessments compiled **exclusively from public sources** (Covert Shores,
+  Wikipedia, FAS, USNI, CRS, GlobalSecurity, naval-technology), with citations
+  in-app. Ownship platform changes your max speed, test depth, and self-noise.
+  Platform-driven realism: pumpjet boats suppress blade-rate lines (denying
+  turn-count), diesel boats are near-silent on battery but blaze with diesel
+  lines while snorkeling, twin-shaft designs show a second blade-rate family,
+  US plants show 60 Hz electrical lines vs 50 Hz for Russian/Chinese hulls.
+
+> **Note on realism:** actual acoustic signatures of real platforms are
+> classified. All in-sim source levels and tonal structures are *gameplay
+> values* derived only from public **relative** quieting assessments (e.g.
+> "quieter than an improved Los Angeles") and generic physics (blade rate =
+> RPM × blades / 60). Nothing here encodes real measured data.
 
 ## Running locally
 

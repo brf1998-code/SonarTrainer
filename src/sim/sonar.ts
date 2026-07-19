@@ -6,7 +6,7 @@
 
 import { Detection, DetectionPath, Environment, Ship, SonarArray } from './types';
 import { computePaths } from './propagation';
-import { broadbandSLAt } from './signatures';
+import { broadbandSLAt, isSnorkeling } from './signatures';
 import { DT, FLUCTUATION_SIGMA } from './constants';
 import { bearingTo, clamp, gaussian, norm360, rangeYds, relBearing } from './geo';
 
@@ -46,20 +46,27 @@ export function ambientNL(env: Environment, arrType: 'sphere' | 'towed'): number
   return arrType === 'sphere' ? seaNoise : Math.max(shipNoise, seaNoise - 6);
 }
 
-/** ownship self noise at speed for an array, dB */
-export function selfNoise(speedKts: number, arrType: 'sphere' | 'towed'): number {
+/** ownship self noise at speed for an array, dB.
+ *  `platformDelta`: quieting-tier adjustment for the ownship platform. */
+export function selfNoise(speedKts: number, arrType: 'sphere' | 'towed', platformDelta = 0): number {
   // flow noise rises sharply with speed; towed array is quieter (away from hull)
-  const base = arrType === 'sphere' ? 48 : 40;
+  const base = (arrType === 'sphere' ? 48 : 40) + platformDelta;
   const knee = arrType === 'sphere' ? 8 : 10;
   const excess = Math.max(0, speedKts - knee);
   return base + speedKts * 0.7 + excess * excess * 0.28;
 }
 
-export function totalNL(env: Environment, speedKts: number, arrType: 'sphere' | 'towed', ownBelowLayer: boolean): number {
+export function totalNL(
+  env: Environment,
+  speedKts: number,
+  arrType: 'sphere' | 'towed',
+  ownBelowLayer: boolean,
+  platformDelta = 0,
+): number {
   let amb = ambientNL(env, arrType);
   // below the layer, surface-generated noise is somewhat attenuated
   if (ownBelowLayer && env.layerDepthFt > 0) amb -= 3;
-  const self = selfNoise(speedKts, arrType);
+  const self = selfNoise(speedKts, arrType, platformDelta);
   // power sum
   return 10 * Math.log10(Math.pow(10, amb / 10) + Math.pow(10, self / 10));
 }
@@ -92,6 +99,7 @@ export function evaluateDetection(
   env: Environment,
   t: number,
   contactSeed: number,
+  ownNoiseDelta = 0,
 ): Detection | null {
   if (!arr.deployed) return null;
   const truthBearing = bearingTo(own.pos, contact.pos);
@@ -117,8 +125,10 @@ export function evaluateDetection(
   // quiet submarines radiate little high-frequency broadband: the sphere
   // (mid/high-freq) sees them much weaker than the low-freq towed array does
   if (contact.contactClass === 'submarine' && arr.type === 'sphere') sl -= 8;
+  // diesel boats snorkeling are dramatically louder
+  if (isSnorkeling(contact.signature, contact.depth)) sl += 16;
   const ownBelow = own.depth > env.layerDepthFt;
-  const nl = totalNL(env, own.speed, arr.type, ownBelow);
+  const nl = totalNL(env, own.speed, arr.type, ownBelow, ownNoiseDelta);
   const fluc = fluctuation(t, contactSeed);
   // towed-array low-freq narrowband processing credit against tonal-rich sources
   const dtEff = arr.type === 'towed' && contact.signature.tonals.length > 0 ? DT - 12 : DT;

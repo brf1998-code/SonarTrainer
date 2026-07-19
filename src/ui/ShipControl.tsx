@@ -19,7 +19,7 @@ export default function ShipControl({ sim, tick }: Props) {
 
   return (
     <div className="panel">
-      <h3>SHIP CONTROL</h3>
+      <h3>SHIP CONTROL — {sim.ownPlatform.shortName.toUpperCase()}</h3>
       <div className="kv">
         <span className="k">course</span>
         <span className="v green">{String(Math.round(own.course)).padStart(3, '0')}</span>
@@ -83,6 +83,9 @@ export default function ShipControl({ sim, tick }: Props) {
         <span className={sim.towed.deployed ? 'green' : 'dim'}>{sim.towedStatus}</span>
         <span className="spacer" />
         <button onClick={() => sim.toggleTowed()}>{sim.towed.deployed ? 'RETRIEVE' : 'STREAM'}</button>
+      </div>
+      <div className="help-block">
+        Max speed ~{sim.ownPlatform.maxSpeedKts} kts · test depth ~{sim.ownPlatform.testDepthFt} ft (public est.)
       </div>
       <div className="help-block">
         Layer depth: {layer > 0 ? `${layer} ft` : 'none'} · water: {sim.env.waterDepthFt} ft · SS{sim.env.seaState} ·{' '}

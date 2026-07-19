@@ -3,6 +3,12 @@ import { Simulation } from '../sim/simulation';
 import { Tracker } from '../sim/types';
 import { solutionPosAt } from '../sim/tma';
 import { DEG } from '../sim/constants';
+import { PLATFORMS } from '../sim/platforms';
+
+function truthLabel(name: string, platformId: string | undefined, cls: string): string {
+  const p = platformId ? PLATFORMS.find((x) => x.id === platformId) : undefined;
+  return `${name} (${p ? p.shortName : cls})`;
+}
 
 const SIZE = 640;
 const ZOOMS = [5000, 10000, 20000, 40000, 80000]; // radius yards
@@ -119,7 +125,7 @@ export default function GeoPlot({ sim, tick, truthMode, selectedTracker }: Props
         ctx.lineTo(lx, ly);
         ctx.stroke();
         ctx.fillStyle = '#ffb454';
-        ctx.fillText(`${c.ship.name} (${c.ship.contactClass})`, px + 8, py + 12);
+        ctx.fillText(truthLabel(c.ship.name, c.ship.signature.platformId, c.ship.contactClass), px + 8, py + 12);
       }
     }
 

@@ -13,15 +13,18 @@ import ToolsPanel from './ui/ToolsPanel';
 import ShipControl from './ui/ShipControl';
 import TutorialPanel from './ui/TutorialPanel';
 import EventLog from './ui/EventLog';
+import IntelPanel from './ui/IntelPanel';
+import { OWNSHIP_PLATFORMS } from './sim/platforms';
 
-type Tab = 'sonar' | 'geo' | 'tools';
+type Tab = 'sonar' | 'geo' | 'tools' | 'intel';
 
 export default function App() {
   const [scenarioId, setScenarioId] = useState('tut-bearing-rate');
+  const [ownPlatformId, setOwnPlatformId] = useState('virginia');
   const [simVersion, setSimVersion] = useState(0);
   const simRef = useRef<Simulation | null>(null);
   if (!simRef.current) {
-    simRef.current = new Simulation(scenarioById(scenarioId));
+    simRef.current = new Simulation(scenarioById(scenarioId), ownPlatformId);
   }
   const sim = simRef.current;
 
@@ -50,8 +53,8 @@ export default function App() {
     return () => clearInterval(iv);
   }, [sim, timeScale, paused]);
 
-  const resetScenario = (id: string) => {
-    simRef.current = new Simulation(scenarioById(id));
+  const resetScenario = (id: string, platformId = ownPlatformId) => {
+    simRef.current = new Simulation(scenarioById(id), platformId);
     setScenarioId(id);
     setSimVersion((v) => v + 1);
     setSelectedTrackerId(null);
@@ -77,6 +80,20 @@ export default function App() {
           {SCENARIOS.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={ownPlatformId}
+          title="ownship platform (resets scenario)"
+          onChange={(e) => {
+            setOwnPlatformId(e.target.value);
+            resetScenario(scenarioId, e.target.value);
+          }}
+        >
+          {OWNSHIP_PLATFORMS.map((p) => (
+            <option key={p.id} value={p.id}>
+              OWN: {p.shortName}
             </option>
           ))}
         </select>
@@ -119,9 +136,9 @@ export default function App() {
 
         <div className="col center">
           <div className="tabs">
-            {(['sonar', 'geo', 'tools'] as Tab[]).map((t) => (
+            {(['sonar', 'geo', 'tools', 'intel'] as Tab[]).map((t) => (
               <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
-                {t === 'sonar' ? 'SONAR' : t === 'geo' ? 'GEO PLOT' : 'TOOLS'}
+                {t === 'sonar' ? 'SONAR' : t === 'geo' ? 'GEO PLOT' : t === 'tools' ? 'TOOLS' : 'INTEL'}
               </button>
             ))}
             <span className="spacer" />
@@ -164,6 +181,7 @@ export default function App() {
             <GeoPlot sim={sim} tick={tick} truthMode={truthMode} selectedTracker={selectedTracker} />
           )}
           {tab === 'tools' && <ToolsPanel sim={sim} tick={tick} tracker={selectedTracker} />}
+          {tab === 'intel' && <IntelPanel />}
         </div>
 
         <div className="col right">

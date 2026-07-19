@@ -122,21 +122,33 @@ export interface LiveTonal {
   label: string;
 }
 
-export function liveTonals(sig: Signature, speedKts: number): LiveTonal[] {
+export function liveTonals(sig: Signature, speedKts: number, snorkeling = false): LiveTonal[] {
   const out: LiveTonal[] = [];
+  const harmonics = sig.pumpjet ? 2 : 4;
   for (const tn of sig.tonals) {
     if (tn.speedScaled) {
       const br = bladeRateHz(sig, speedKts);
       if (br > 0.5) {
-        for (let h = 1; h <= 4; h++) {
+        for (let h = 1; h <= harmonics; h++) {
           out.push({ freq: br * h, level: tn.level - (h - 1) * 4, label: h === 1 ? tn.label : `${tn.label} x${h}` });
         }
-        // shaft-rate line (1/blades of blade rate) — weaker
-        out.push({ freq: br / sig.blades, level: tn.level - 8, label: 'shaft rate' });
+        // shaft-rate line (1/blades of blade rate) — weaker, absent on pumpjets
+        if (!sig.pumpjet) out.push({ freq: br / sig.blades, level: tn.level - 8, label: 'shaft rate' });
       }
     } else {
       out.push({ freq: tn.freq, level: tn.level, label: tn.label });
     }
   }
+  // diesel boat snorkeling: loud diesel firing lines appear
+  if (sig.dieselBoat && snorkeling) {
+    out.push({ freq: 55, level: sig.broadbandSL + 6, label: 'DIESEL (snorkeling)' });
+    out.push({ freq: 110, level: sig.broadbandSL + 2, label: 'diesel x2 (snorkeling)' });
+    out.push({ freq: 165, level: sig.broadbandSL - 2, label: 'diesel x3 (snorkeling)' });
+  }
   return out.filter((x) => x.freq > 1 && x.freq < 2000);
+}
+
+/** a diesel boat shallower than ~65 ft is treated as snorkeling */
+export function isSnorkeling(sig: Signature, depthFt: number): boolean {
+  return !!sig.dieselBoat && depthFt < 65;
 }

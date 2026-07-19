@@ -30,9 +30,16 @@ import {
   DEPTH_RATE,
 } from './constants';
 import { advance, bearingTo, clamp, gaussian, norm180, norm360, rangeYds } from './geo';
-import { makeSignature, liveTonals, bladeRateHz } from './signatures';
+import { makeSignature, liveTonals, bladeRateHz, isSnorkeling } from './signatures';
 import { evaluateDetection, makeSphere, makeTowed, totalNL } from './sonar';
 import { computePaths } from './propagation';
+import {
+  Platform,
+  contactClassFor,
+  platformById,
+  selfNoiseDelta,
+  signatureForPlatform,
+} from './platforms';
 
 export const BB_BINS = 720; // 0.5 deg per bin
 export const NB_BINS = 256;
@@ -75,6 +82,7 @@ export class Simulation {
   trackers: Tracker[] = [];
   events: SimEvent[] = [];
   scenario: Scenario;
+  ownPlatform: Platform;
 
   /** latest detection snapshot per array */
   detections: Record<ArrayType, Detection[]> = { sphere: [], towed: [] };
@@ -91,9 +99,10 @@ export class Simulation {
   private nextTrackerNum = 1;
   private prevTurning = false;
 
-  constructor(scenario: Scenario) {
+  constructor(scenario: Scenario, ownPlatformId?: string) {
     this.scenario = scenario;
     this.env = scenario.env;
+    this.ownPlatform = platformById(ownPlatformId ?? scenario.ownPlatformId ?? 'virginia');
     this.own = {
       id: 'ownship',
       name: 'OWNSHIP',
@@ -105,7 +114,7 @@ export class Simulation {
       orderedCourse: scenario.ownCourse,
       orderedSpeed: scenario.ownSpeed,
       orderedDepth: scenario.ownDepth,
-      signature: makeSignature('submarine', 0.5),
+      signature: signatureForPlatform(this.ownPlatform, 0.5),
     };
     let i = 0;
     for (const c of scenario.contacts) {
@@ -115,11 +124,13 @@ export class Simulation {
         y: Math.cos(rad) * c.rangeYds,
       };
       const seed = (i + 1) * 0.173;
+      const hullSeed = (seed * 7.13) % 1;
+      const platform = c.platformId ? platformById(c.platformId) : null;
       this.contacts.push({
         ship: {
           id: `c${i}`,
           name: c.name,
-          contactClass: c.contactClass,
+          contactClass: platform ? contactClassFor(platform) : c.contactClass,
           pos,
           course: c.course,
           speed: c.speed,
@@ -127,7 +138,9 @@ export class Simulation {
           orderedCourse: c.course,
           orderedSpeed: c.speed,
           orderedDepth: c.depth,
-          signature: makeSignature(c.contactClass, (seed * 7.13) % 1),
+          signature: platform
+            ? signatureForPlatform(platform, hullSeed)
+            : makeSignature(c.contactClass, hullSeed),
         },
         seed,
         nextZigT: 600 + Math.random() * 600,
@@ -135,6 +148,7 @@ export class Simulation {
       i++;
     }
     this.log(`Scenario: ${scenario.name}`);
+    this.log(`Ownship: ${this.ownPlatform.name}`);
     this.log(`Environment: ${this.env.name}`);
     this.snapshotDetections();
     this.pushBBRow();
@@ -152,11 +166,12 @@ export class Simulation {
     this.log(`Ordered course ${Math.round(norm360(c)).toString().padStart(3, '0')}`);
   }
   orderSpeed(s: number) {
-    this.own.orderedSpeed = clamp(s, 2, 30);
+    this.own.orderedSpeed = clamp(s, 2, this.ownPlatform.maxSpeedKts);
     this.log(`Ordered speed ${this.own.orderedSpeed} kts`);
   }
   orderDepth(d: number) {
-    this.own.orderedDepth = clamp(d, 60, Math.min(1500, this.env.waterDepthFt - 200));
+    const maxD = Math.min(this.ownPlatform.testDepthFt ?? 1500, this.env.waterDepthFt - 200);
+    this.own.orderedDepth = clamp(d, 60, maxD);
     this.log(`Ordered depth ${this.own.orderedDepth} ft`);
   }
   toggleTowed() {
@@ -274,8 +289,9 @@ export class Simulation {
     for (const arr of [this.sphere, this.towed]) {
       const prev = this.detections[arr.type];
       const now: Detection[] = [];
+      const noiseDelta = selfNoiseDelta(this.ownPlatform);
       for (const c of this.contacts) {
-        const d = evaluateDetection(this.own, c.ship, arr, this.env, this.t, c.seed);
+        const d = evaluateDetection(this.own, c.ship, arr, this.env, this.t, c.seed, noiseDelta);
         if (d) now.push(d);
       }
       // gained/lost events
@@ -356,10 +372,10 @@ export class Simulation {
       : undefined;
     if (det && arr.deployed) {
       const c = this.contacts.find((x) => x.ship.id === tr.contactId)!;
-      const tonals = liveTonals(c.ship.signature, c.ship.speed);
+      const tonals = liveTonals(c.ship.signature, c.ship.speed, isSnorkeling(c.ship.signature, c.ship.depth));
       const bestPathTL = this.pathTLFor(c.ship, det.paths[0].path);
       const ownBelow = this.own.depth > this.env.layerDepthFt;
-      const nl = totalNL(this.env, this.own.speed, arr.type, ownBelow);
+      const nl = totalNL(this.env, this.own.speed, arr.type, ownBelow, selfNoiseDelta(this.ownPlatform));
       for (const tn of tonals) {
         if (tn.freq < arr.bandLo * 0.5 || tn.freq > arr.bandHi) continue;
         // narrowband processing gain: effective DT much lower than broadband
@@ -402,10 +418,10 @@ export class Simulation {
     if (!det) return { bladeRateHz: null, harmonics: 0, strongestTonals: [] };
     const c = this.contacts.find((x) => x.ship.id === tr.contactId)!;
     const arr = tr.arrayType === 'sphere' ? this.sphere : this.towed;
-    const tonals = liveTonals(c.ship.signature, c.ship.speed);
+    const tonals = liveTonals(c.ship.signature, c.ship.speed, isSnorkeling(c.ship.signature, c.ship.depth));
     const bestPathTL = this.pathTLFor(c.ship, det.paths[0].path);
     const ownBelow = this.own.depth > this.env.layerDepthFt;
-    const nl = totalNL(this.env, this.own.speed, arr.type, ownBelow);
+    const nl = totalNL(this.env, this.own.speed, arr.type, ownBelow, selfNoiseDelta(this.ownPlatform));
     const strong = tonals
       .map((tn) => ({ freq: tn.freq, label: tn.label, snr: tn.level - bestPathTL - (nl - arr.di) + 12 }))
       .filter((x) => x.snr > 2 && x.freq <= arr.bandHi)

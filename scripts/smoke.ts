@@ -93,7 +93,54 @@ function check(name: string, ok: boolean, detail = '') {
   console.log(`  (sphere holds ${sphereHolds} — quiet sub expected mostly towed-only)`);
 }
 
-// ---- 6. Layer effect sanity: cross-layer TL > same-side TL ----------------
+// ---- 6. Platform scenarios: Yasen-M intermittently held; snorkeler audible above layer ----
+{
+  const sim = new Simulation(scenarioById('barents'), 'seawolf');
+  sim.toggleTowed();
+  sim.step(320);
+  let held = 0;
+  for (let i = 0; i < 30; i++) {
+    sim.step(20);
+    if (sim.detections.towed.length > 0) held++;
+  }
+  check('barents: Yasen-M held at least intermittently on towed', held >= 3, `${held}/30 snapshots`);
+  const sphereHeld = sim.detections.sphere.some((d) => d.contactId === 'c0');
+  console.log(`  (sphere holds Yasen: ${sphereHeld} — expected mostly false)`);
+}
+{
+  const sim = new Simulation(scenarioById('scs-patrol'), 'virginia');
+  sim.toggleTowed();
+  sim.step(320);
+  // below the layer: snorkeler should be hard/impossible
+  const belowHeld = [...sim.detections.sphere, ...sim.detections.towed].some((d) => d.contactId === 'c2');
+  // go above the layer and slow: snorkeler diesel should come through
+  sim.orderDepth(100);
+  sim.step(400);
+  let aboveHeld = false;
+  for (let i = 0; i < 20; i++) {
+    sim.step(15);
+    if ([...sim.detections.sphere, ...sim.detections.towed].some((d) => d.contactId === 'c2')) {
+      aboveHeld = true;
+      break;
+    }
+  }
+  check('scs: snorkeling Yuan detected after going above layer', aboveHeld, `below-layer held=${belowHeld}`);
+}
+
+// ---- 7. Pumpjet vs screw narrowband: pumpjet denies turn count -------------
+{
+  const { signatureForPlatform, platformById } = await import('../src/sim/platforms');
+  const { liveTonals } = await import('../src/sim/signatures');
+  const akula = liveTonals(signatureForPlatform(platformById('akula-971'), 0.4), 8);
+  const borei = liveTonals(signatureForPlatform(platformById('borei-a'), 0.4), 8);
+  const akulaBR = akula.filter((t) => t.label.startsWith('blade rate'));
+  const boreiBR = borei.filter((t) => t.label.startsWith('blade rate'));
+  const akulaMax = Math.max(...akulaBR.map((t) => t.level));
+  const boreiMax = Math.max(...boreiBR.map((t) => t.level));
+  check('pumpjet blade-rate suppressed vs screw', boreiMax < akulaMax - 4, `akula ${akulaMax.toFixed(0)} vs borei ${boreiMax.toFixed(0)}`);
+}
+
+// ---- 8. Layer effect sanity: cross-layer TL > same-side TL ----------------
 {
   const { computePaths } = await import('../src/sim/propagation');
   const env = scenarioById('open-ocean').env;
