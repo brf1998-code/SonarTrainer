@@ -76,6 +76,9 @@ export default function App() {
     <div className="app" key={simVersion}>
       <div className="topbar">
         <span className="title">SONAR / TMA TRAINER</span>
+        <span className="dim small" style={{ marginLeft: -4 }}>
+          by Brendan Finn · Former Sub JO
+        </span>
         <select value={scenarioId} onChange={(e) => resetScenario(e.target.value)}>
           {SCENARIOS.map((s) => (
             <option key={s.id} value={s.id}>

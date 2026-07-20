@@ -1,7 +1,11 @@
 # Sonar / TMA Trainer
 
+**Built by Brendan Finn — Former Submarine Junior Officer.**
+
 An open-source sonar and contact-management (Target Motion Analysis) trainer for
-submarine junior officers. Runs entirely in the browser; built with React +
+submarine junior officers, built by someone who lived the problem: there are
+far too few opportunities to get real reps at sonar interpretation and contact
+management before you're standing watch. Runs entirely in the browser; built with React +
 TypeScript, deployable to Railway with zero configuration.
 
 **Everything in this trainer is built exclusively from open, public literature**
